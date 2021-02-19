@@ -20,25 +20,18 @@ end
 
 -- 执行程序
 function run()
-    local e = {}
-    local uci = luci.model.uci.cursor()
-    local data = luci.http.formvalue()
-    uci:tset('jd-dailybonus', '@global[0]', data)
-    uci:commit('jd-dailybonus')
-    luci.sys.call('lua /usr/share/jd-dailybonus/gen_cookieset.lua')
-    luci.sys.call('/usr/share/jd-dailybonus/newapp.sh -r')
-    luci.sys.call('/usr/share/jd-dailybonus/newapp.sh -a')
-    e.error = 0
-
-    luci.http.prepare_content('application/json')
-    luci.http.write_json(e)
+    local running = luci.sys.call("busybox ps -w | grep JD_DailyBonus.js | grep -v grep >/dev/null") == 0
+    if not running then
+        luci.sys.call('sh /usr/share/jd-dailybonus/newapp.sh -r')
+    end
+    luci.http.write('')
 end
 
 --检查更新
 function check_update()
     local jd = 'jd-dailybonus'
     local e = {}
-    local new_version = luci.sys.exec('/usr/share/jd-dailybonus/newapp.sh -n')
+    local new_version = luci.sys.exec('sh /usr/share/jd-dailybonus/newapp.sh -n')
     e.new_version = new_version
     e.error = 0
     luci.http.prepare_content('application/json')
@@ -52,7 +45,7 @@ function update()
     local uci = luci.model.uci.cursor()
     local version = luci.http.formvalue('version')
     --下载脚本
-    local code = luci.sys.exec('/usr/share/jd-dailybonus/newapp.sh -u')
+    local code = luci.sys.exec('sh /usr/share/jd-dailybonus/newapp.sh -u')
     e.error = code
     luci.http.prepare_content('application/json')
     luci.http.write_json(e)
@@ -127,6 +120,9 @@ end
 
 function get_log()
     local fs = require "nixio.fs"
-    local log = fs.readfile("/var/log/jd_dailybonus.log") or ""
-    luci.http.write(log)
+    local e = {}
+    e.running = luci.sys.call("busybox ps -w | grep JD_DailyBonus.js | grep -v grep >/dev/null") == 0
+    e.log = fs.readfile("/var/log/jd_dailybonus.log") or ""
+	luci.http.prepare_content("application/json")
+	luci.http.write_json(e)
 end
